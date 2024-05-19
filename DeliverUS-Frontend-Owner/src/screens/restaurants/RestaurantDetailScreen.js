@@ -4,7 +4,7 @@ import { StyleSheet, View, FlatList, ImageBackground, Image, Pressable } from 'r
 import { showMessage } from 'react-native-flash-message'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { getDetail } from '../../api/RestaurantEndpoints'
-import { remove } from '../../api/ProductEndpoints'
+import { remove, togglePromote } from '../../api/ProductEndpoints'
 import ImageCard from '../../components/ImageCard'
 import TextRegular from '../../components/TextRegular'
 import TextSemiBold from '../../components/TextSemibold'
@@ -58,14 +58,34 @@ export default function RestaurantDetailScreen ({ navigation, route }) {
     return (
       <ImageCard
         imageUri={item.image ? { uri: process.env.API_BASE_URL + '/' + item.image } : defaultProductImage}
-        title={item.name}
       >
+        <TextSemiBold textStyle={{ fontSize: 15 }}>{item.name} {item.promoted && restaurant.discount > 0 && <TextSemiBold textStyle={{ color: GlobalStyles.brandPrimary }}>({restaurant.discount}% off)</TextSemiBold> }</TextSemiBold>
         <TextRegular numberOfLines={2}>{item.description}</TextRegular>
-        <TextSemiBold textStyle={styles.price}>{item.price.toFixed(2)}€</TextSemiBold>
+        <TextSemiBold textStyle={styles.price}>{item.price.toFixed(2)}€ {item.promoted && restaurant.discount > 0 && <TextSemiBold textStyle={{ color: GlobalStyles.brandPrimary }}>Price promoted: {(item.price * (1 - restaurant.discount / 100)).toFixed(2)}€</TextSemiBold> }</TextSemiBold>
         {!item.availability &&
           <TextRegular textStyle={styles.availability }>Not available</TextRegular>
         }
          <View style={styles.actionButtonsContainer}>
+
+         { restaurant.discount > 0 && <Pressable
+            onPress={() => toggleProm(item)
+            }
+            style={({ pressed }) => [
+              {
+                backgroundColor: pressed
+                  ? GlobalStyles.brandSuccessTap
+                  : GlobalStyles.brandSuccess
+              },
+              [styles.actionButton, { width: restaurant.discount > 0 ? '34%' : '50%' }]
+            ]}>
+          <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
+            <MaterialCommunityIcons name={item.promoted ? 'star' : 'star-outline'} color={'white'} size={20}/>
+            <TextRegular textStyle={styles.text}>
+              {item.promote ? 'Demote' : 'Promote'}
+            </TextRegular>
+          </View>
+        </Pressable> }
+
           <Pressable
             onPress={() => navigation.navigate('EditProductScreen', { id: item.id })
             }
@@ -75,7 +95,7 @@ export default function RestaurantDetailScreen ({ navigation, route }) {
                   ? GlobalStyles.brandBlueTap
                   : GlobalStyles.brandBlue
               },
-              styles.actionButton
+              [styles.actionButton, { width: restaurant.discount > 0 ? '34%' : '50%' }]
             ]}>
           <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
             <MaterialCommunityIcons name='pencil' color={'white'} size={20}/>
@@ -93,7 +113,7 @@ export default function RestaurantDetailScreen ({ navigation, route }) {
                   ? GlobalStyles.brandPrimaryTap
                   : GlobalStyles.brandPrimary
               },
-              styles.actionButton
+              [styles.actionButton, { width: restaurant.discount > 0 ? '34%' : '53%' }]
             ]}>
           <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
             <MaterialCommunityIcons name='delete' color={'white'} size={20}/>
@@ -122,6 +142,26 @@ export default function RestaurantDetailScreen ({ navigation, route }) {
     } catch (error) {
       showMessage({
         message: `There was an error while retrieving restaurant details (id ${route.params.id}). ${error}`,
+        type: 'error',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    }
+  }
+
+  const toggleProm = async (item) => {
+    try {
+      await togglePromote(item.id)
+      await fetchRestaurantDetail()
+      showMessage({
+        message: `Restaurant ${item.name} was ${item.promoted ? 'demoted' : 'promoted'} successfully`,
+        type: 'success',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+    } catch (error) {
+      showMessage({
+        message: `There was an error while ${item.promoted ? 'demoting' : 'promoting'} product ${item.name} (id ${route.params.id}). ${error}`,
         type: 'error',
         style: GlobalStyles.flashStyle,
         titleStyle: GlobalStyles.flashTextStyle
@@ -236,8 +276,7 @@ const styles = StyleSheet.create({
     margin: '1%',
     padding: 10,
     alignSelf: 'center',
-    flexDirection: 'column',
-    width: '50%'
+    flexDirection: 'column'
   },
   actionButtonsContainer: {
     flexDirection: 'row',
